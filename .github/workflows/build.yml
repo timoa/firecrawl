@@ -30,7 +30,7 @@ jobs:
           docker build . --tag ghcr.io/${{github.actor}}/firecrawl-playwright:latest
           docker push ghcr.io/${{github.actor}}/firecrawl-playwright:latest
   
-  # API & Worker       
+  # API & Worker
   api-image:
     runs-on: ubuntu-latest
     defaults:
