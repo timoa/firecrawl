@@ -27,8 +27,8 @@ jobs:
 
       - name: 'Build Playwright Service Image'
         run: |
-          docker build . --tag ghcr.io/${{github.actor}}/playright-service:latest
-          docker push ghcr.io/${{github.actor}}/playright-service:latest
+          docker build . --tag ghcr.io/${{github.actor}}/firecrawl-playwright:latest
+          docker push ghcr.io/${{github.actor}}/firecrawl-playwright:latest
   
   # API & Worker       
   api-image:
@@ -49,5 +49,5 @@ jobs:
 
       - name: 'Build the API Image'
         run: |
-          docker build . --tag ghcr.io/${{github.actor}}/api:latest
-          docker push ghcr.io/${{github.actor}}/api:latest
+          docker build . --tag ghcr.io/${{github.actor}}/firecrawl:latest
+          docker push ghcr.io/${{github.actor}}/firecrawl:latest
