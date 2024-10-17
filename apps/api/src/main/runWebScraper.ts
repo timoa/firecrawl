@@ -59,6 +59,7 @@ export async function startWebScraperPipeline({
     is_scrape: job.data.is_scrape ?? false,
   })) as { success: boolean; message: string; docs: Document[] };
 }
+
 export async function runWebScraper({
   url,
   mode,
@@ -120,7 +121,7 @@ export async function runWebScraper({
       : docs;
 
     if(is_scrape === false) {
-      billTeam(team_id, filteredDocs.length).catch(error => {
+      billTeam(team_id, undefined, filteredDocs.length).catch(error => {
         Logger.error(`Failed to bill team ${team_id} for ${filteredDocs.length} credits: ${error}`);
         // Optionally, you could notify an admin or add to a retry queue here
       });

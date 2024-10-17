@@ -44,6 +44,7 @@ export async function scrapeController(
       mode: "single_urls",
       crawlerOptions: {},
       team_id: req.auth.team_id,
+      plan: req.auth.plan,
       pageOptions,
       extractorOptions,
       origin: req.body.origin,
@@ -54,9 +55,11 @@ export async function scrapeController(
     jobPriority
   );
 
+  const totalWait = (req.body.waitFor ?? 0) + (req.body.actions ?? []).reduce((a,x) => (x.type === "wait" ? x.milliseconds : 0) + a, 0);
+
   let doc: any | undefined;
   try {
-    doc = (await waitForJob(job.id, timeout))[0];
+    doc = (await waitForJob(job.id, timeout + totalWait))[0];
   } catch (e) {
     Logger.error(`Error in scrapeController: ${e}`);
     if (e instanceof Error && e.message.startsWith("Job wait")) {
@@ -106,7 +109,7 @@ export async function scrapeController(
     creditsToBeBilled = 5;
   }
 
-  billTeam(req.auth.team_id, creditsToBeBilled).catch(error => {
+  billTeam(req.auth.team_id, req.acuc?.sub_id, creditsToBeBilled).catch(error => {
     Logger.error(`Failed to bill team ${req.auth.team_id} for ${creditsToBeBilled} credits: ${error}`);
     // Optionally, you could notify an admin or add to a retry queue here
   });
@@ -136,7 +139,7 @@ export async function scrapeController(
     crawlerOptions: {},
     pageOptions: pageOptions,
     origin: origin,
-    extractor_options: { mode: "markdown" },
+    extractor_options: extractorOptions,
     num_tokens: numTokens,
   });
 

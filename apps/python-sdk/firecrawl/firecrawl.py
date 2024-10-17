@@ -117,7 +117,14 @@ class FirecrawlApp:
             idempotency_key (Optional[str]): A unique uuid key to ensure idempotency of requests.
 
         Returns:
-            Any: The crawl job ID or the crawl results if waiting until completion.
+            Dict[str, Any]: A dictionary containing the crawl results. The structure includes:
+                - 'success' (bool): Indicates if the crawl was successful.
+                - 'status' (str): The final status of the crawl job (e.g., 'completed').
+                - 'completed' (int): Number of scraped pages that completed.
+                - 'total' (int): Total number of scraped pages.
+                - 'creditsUsed' (int): Estimated number of API credits used for this crawl.
+                - 'expiresAt' (str): ISO 8601 formatted date-time string indicating when the crawl data expires.
+                - 'data' (List[Dict]): List of all the scraped pages.
 
         Raises:
             Exception: If the crawl job initiation or monitoring fails.
@@ -146,7 +153,10 @@ class FirecrawlApp:
             idempotency_key (Optional[str]): A unique uuid key to ensure idempotency of requests.
 
         Returns:
-            Dict[str, Any]: The response from the crawl initiation request.
+            Dict[str, Any]: A dictionary containing the crawl initiation response. The structure includes:
+                - 'success' (bool): Indicates if the crawl initiation was successful.
+                - 'id' (str): The unique identifier for the crawl job.
+                - 'url' (str): The URL to check the status of the crawl job.
         """
         endpoint = f'/v1/crawl'
         headers = self._prepare_headers(idempotency_key)
@@ -191,6 +201,23 @@ class FirecrawlApp:
             }
         else:
             self._handle_error(response, 'check crawl status')
+    
+    def cancel_crawl(self, id: str) -> Dict[str, Any]:
+        """
+        Cancel an asynchronous crawl job using the Firecrawl API.
+
+        Args:
+            id (str): The ID of the crawl job to cancel.
+
+        Returns:
+            Dict[str, Any]: The response from the cancel crawl request.
+        """
+        headers = self._prepare_headers()
+        response = self._delete_request(f'{self.api_url}/v1/crawl/{id}', headers)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            self._handle_error(response, "cancel crawl job")
 
     def crawl_url_and_watch(self, url: str, params: Optional[Dict[str, Any]] = None, idempotency_key: Optional[str] = None) -> 'CrawlWatcher':
         """
@@ -219,7 +246,7 @@ class FirecrawlApp:
             params (Optional[Dict[str, Any]]): Additional parameters for the map search.
 
         Returns:
-            Any: The result of the map search, typically a dictionary containing mapping data.
+            List[str]: A list of URLs discovered during the map search.
         """
         endpoint = f'/v1/map'
         headers = self._prepare_headers()
@@ -228,7 +255,7 @@ class FirecrawlApp:
         json_data = {'url': url}
         if params:
             json_data.update(params)
-        
+
         # Make the POST request with the prepared headers and JSON data
         response = requests.post(
             f'{self.api_url}{endpoint}',
@@ -238,7 +265,7 @@ class FirecrawlApp:
         if response.status_code == 200:
             response = response.json()
             if response['success'] and 'links' in response:
-                return response['links']
+                return response
             else:
                 raise Exception(f'Failed to map URL. Error: {response["error"]}')
         else:
@@ -316,6 +343,33 @@ class FirecrawlApp:
         """
         for attempt in range(retries):
             response = requests.get(url, headers=headers)
+            if response.status_code == 502:
+                time.sleep(backoff_factor * (2 ** attempt))
+            else:
+                return response
+        return response
+    
+    def _delete_request(self, url: str,
+                        headers: Dict[str, str],
+                        retries: int = 3,
+                        backoff_factor: float = 0.5) -> requests.Response:
+        """
+        Make a DELETE request with retries.
+
+        Args:
+            url (str): The URL to send the DELETE request to.
+            headers (Dict[str, str]): The headers to include in the DELETE request.
+            retries (int): Number of retries for the request.
+            backoff_factor (float): Backoff factor for retries.
+
+        Returns:
+            requests.Response: The response from the DELETE request.
+
+        Raises:
+            requests.RequestException: If the request fails after the specified retries.
+        """
+        for attempt in range(retries):
+            response = requests.delete(url, headers=headers)
             if response.status_code == 502:
                 time.sleep(backoff_factor * (2 ** attempt))
             else:

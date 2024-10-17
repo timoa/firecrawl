@@ -61,6 +61,7 @@ export async function scrapeHelper(
       crawlerOptions,
       team_id,
       pageOptions,
+      plan,
       extractorOptions,
       origin: req.body.origin ?? defaultOrigin,
       is_scrape: true,
@@ -157,7 +158,7 @@ export async function scrapeController(req: Request, res: Response) {
   try {
     let earlyReturn = false;
     // make sure to authenticate user first, Bearer <token>
-    const { success, team_id, error, status, plan } = await authenticateUser(
+    const { success, team_id, error, status, plan, chunk } = await authenticateUser(
       req,
       res,
       RateLimiterMode.Scrape
@@ -193,10 +194,10 @@ export async function scrapeController(req: Request, res: Response) {
     // checkCredits
     try {
       const { success: creditsCheckSuccess, message: creditsCheckMessage } =
-        await checkTeamCredits(team_id, 1);
+        await checkTeamCredits(chunk, team_id, 1);
       if (!creditsCheckSuccess) {
         earlyReturn = true;
-        return res.status(402).json({ error: "Insufficient credits" });
+        return res.status(402).json({ error: "Insufficient credits. For more credits, you can upgrade your plan at https://firecrawl.dev/pricing" });
       }
     } catch (error) {
       Logger.error(error);
@@ -244,7 +245,7 @@ export async function scrapeController(req: Request, res: Response) {
       }
       if (creditsToBeBilled > 0) {
         // billing for doc done on queue end, bill only for llm extraction
-        billTeam(team_id, creditsToBeBilled).catch(error => {
+        billTeam(team_id, chunk?.sub_id, creditsToBeBilled).catch(error => {
           Logger.error(`Failed to bill team ${team_id} for ${creditsToBeBilled} credits: ${error}`);
           // Optionally, you could notify an admin or add to a retry queue here
         });

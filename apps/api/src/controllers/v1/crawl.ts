@@ -34,7 +34,11 @@ export async function crawlController(
 
   await logCrawl(id, req.auth.team_id);
 
-  const { remainingCredits } = req.account;
+  let { remainingCredits } = req.account;
+  const useDbAuthentication = process.env.USE_DB_AUTHENTICATION === 'true';
+  if(!useDbAuthentication){
+    remainingCredits = Infinity;
+  }
 
   const crawlerOptions = legacyCrawlerOptions(req.body);
   const pageOptions = legacyScrapeOptions(req.body.scrapeOptions);
@@ -106,6 +110,7 @@ export async function crawlController(
           url,
           mode: "single_urls",
           team_id: req.auth.team_id,
+          plan: req.auth.plan,
           crawlerOptions,
           pageOptions,
           origin: "api",
@@ -138,6 +143,7 @@ export async function crawlController(
         mode: "single_urls",
         crawlerOptions: crawlerOptions,
         team_id: req.auth.team_id,
+        plan: req.auth.plan,
         pageOptions: pageOptions,
         origin: "api",
         crawl_id: id,
