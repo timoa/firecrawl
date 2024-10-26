@@ -13,7 +13,7 @@ import { setTraceAttributes } from "@hyperdx/node-opentelemetry";
 import { sendNotification } from "../services/notification/email_notification";
 import { Logger } from "../lib/logger";
 import { redlock } from "../services/redlock";
-import { getValue } from "../services/redis";
+import { deleteKey, getValue } from "../services/redis";
 import { setValue } from "../services/redis";
 import { validate } from "uuid";
 import * as Sentry from "@sentry/node";
@@ -75,15 +75,19 @@ export async function setCachedACUC(
 
 export async function getACUC(
   api_key: string,
-  cacheOnly = false
+  cacheOnly = false,
+  useCache = true
 ): Promise<AuthCreditUsageChunk | null> {
   const cacheKeyACUC = `acuc_${api_key}`;
 
-  const cachedACUC = await getValue(cacheKeyACUC);
+  if (useCache) {
+    const cachedACUC = await getValue(cacheKeyACUC);
+    if (cachedACUC !== null) {
+      return JSON.parse(cachedACUC);
+    }
+  }
 
-  if (cachedACUC !== null) {
-    return JSON.parse(cachedACUC);
-  } else if (!cacheOnly) {
+  if (!cacheOnly) {
     let data;
     let error;
     let retries = 0;
@@ -91,7 +95,7 @@ export async function getACUC(
 
     while (retries < maxRetries) {
       ({ data, error } = await supabase_service.rpc(
-        "auth_credit_usage_chunk_test_3",
+        "auth_credit_usage_chunk_test_21_credit_pack",
         { input_key: api_key }
       ));
 
@@ -118,14 +122,23 @@ export async function getACUC(
       data.length === 0 ? null : data[0].team_id === null ? null : data[0];
 
     // NOTE: Should we cache null chunks? - mogery
-    if (chunk !== null) {
+    if (chunk !== null && useCache) {
       setCachedACUC(api_key, chunk);
     }
+    
+    // console.log(chunk);
 
     return chunk;
   } else {
     return null;
   }
+}
+
+export async function clearACUC(
+  api_key: string,
+): Promise<void> {
+  const cacheKeyACUC = `acuc_${api_key}`;
+  await deleteKey(cacheKeyACUC);
 }
 
 export async function authenticateUser(
