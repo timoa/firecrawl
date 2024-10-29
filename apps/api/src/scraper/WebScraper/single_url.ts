@@ -21,8 +21,6 @@ import { extractLinks } from "./utils/utils";
 import { Logger } from "../../lib/logger";
 import { ScrapeEvents } from "../../lib/scrape-events";
 import { clientSideError } from "../../strings";
-import { ScrapeActionContent } from "../../lib/entities";
-import { removeBase64Images } from "./utils/removeBase64Images";
 
 dotenv.config();
 
@@ -160,7 +158,7 @@ export async function scrapSingleUrl(
     actions: pageOptions.actions ?? undefined,
     geolocation: pageOptions.geolocation ?? undefined,
     skipTlsVerification: pageOptions.skipTlsVerification ?? false,
-    removeBase64Images: pageOptions.removeBase64Images ?? true,
+    mobile: pageOptions.mobile ?? false,
   }
 
   if (extractorOptions) {
@@ -183,8 +181,7 @@ export async function scrapSingleUrl(
       text: string;
       screenshot: string;
       actions?: {
-        screenshots?: string[];
-        scrapes?: ScrapeActionContent[];
+        screenshots: string[];
       };
       metadata: { pageStatusCode?: number; pageError?: string | null };
     } = { text: "", screenshot: "", metadata: {} };
@@ -263,7 +260,6 @@ export async function scrapSingleUrl(
           if (pageOptions.actions) {
             scraperResponse.actions = {
               screenshots: response.screenshots ?? [],
-              scrapes: response.scrapeActionContent ?? [],
             };
           }
           scraperResponse.metadata.pageStatusCode = response.pageStatusCode;
@@ -352,10 +348,7 @@ export async function scrapSingleUrl(
     }
     //* TODO: add an optional to return markdown or structured/extracted content
     let cleanedHtml = removeUnwantedElements(scraperResponse.text, pageOptions);
-    let text = await parseMarkdown(cleanedHtml);
-    if (pageOptions.removeBase64Images) {
-      text = await removeBase64Images(text);
-    }
+    const text = await parseMarkdown(cleanedHtml);
 
     const insertedLogId = await logInsertPromise;
     ScrapeEvents.updateScrapeResult(insertedLogId, {

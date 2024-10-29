@@ -61,14 +61,8 @@ export type ExtractOptions = z.infer<typeof extractOptions>;
 export const actionsSchema = z.array(z.union([
   z.object({
     type: z.literal("wait"),
-    milliseconds: z.number().int().positive().finite().optional(),
-    selector: z.string().optional(),
-  }).refine(
-    (data) => (data.milliseconds !== undefined || data.selector !== undefined) && !(data.milliseconds !== undefined && data.selector !== undefined),
-    {
-      message: "Either 'milliseconds' or 'selector' must be provided, but not both.",
-    }
-  ),
+    milliseconds: z.number().int().positive().finite(),
+  }),
   z.object({
     type: z.literal("click"),
     selector: z.string(),
@@ -88,9 +82,6 @@ export const actionsSchema = z.array(z.union([
   z.object({
     type: z.literal("scroll"),
     direction: z.enum(["up", "down"]),
-  }),
-  z.object({
-    type: z.literal("scrape"),
   }),
 ]));
 
@@ -116,6 +107,7 @@ export const scrapeOptions = z.object({
   timeout: z.number().int().positive().finite().safe().default(30000),
   waitFor: z.number().int().nonnegative().finite().safe().default(0),
   extract: extractOptions.optional(),
+  mobile: z.boolean().default(false),
   parsePDF: z.boolean().default(true),
   actions: actionsSchema.optional(),
   // New
@@ -140,7 +132,6 @@ export const scrapeOptions = z.object({
     languages: z.string().array().optional(),
   }).optional(),
   skipTlsVerification: z.boolean().default(false),
-  removeBase64Images: z.boolean().default(true),
 }).strict(strictMessage)
 
 
@@ -470,7 +461,7 @@ export function legacyScrapeOptions(x: ScrapeOptions): PageOptions {
     actions: x.actions as Action[], // no strict null checking grrrr - mogery
     geolocation: x.location ?? x.geolocation,
     skipTlsVerification: x.skipTlsVerification,
-    removeBase64Images: x.removeBase64Images,
+    mobile: x.mobile,
   };
 }
 

@@ -28,7 +28,7 @@ export async function scrapWithFireEngine({
   waitFor = 0,
   screenshot = false,
   fullPageScreenshot = false,
-  pageOptions = { parsePDF: true, atsv: false, useFastMode: false, disableJsDom: false, geolocation: { country: "US" }, skipTlsVerification: false, removeBase64Images: true },
+  pageOptions = { parsePDF: true, atsv: false, useFastMode: false, disableJsDom: false, geolocation: { country: "US" }, skipTlsVerification: false, mobile: false },
   fireEngineOptions = {},
   headers,
   options,
@@ -40,7 +40,7 @@ export async function scrapWithFireEngine({
   waitFor?: number;
   screenshot?: boolean;
   fullPageScreenshot?: boolean;
-  pageOptions?: { scrollXPaths?: string[]; parsePDF?: boolean, atsv?: boolean, useFastMode?: boolean, disableJsDom?: boolean, geolocation?: { country?: string }, skipTlsVerification?: boolean, removeBase64Images?: boolean };
+  pageOptions?: { scrollXPaths?: string[]; parsePDF?: boolean, atsv?: boolean, useFastMode?: boolean, disableJsDom?: boolean, geolocation?: { country?: string }, skipTlsVerification?: boolean, mobile?: boolean };
   fireEngineOptions?: FireEngineOptions;
   headers?: Record<string, string>;
   options?: any;
@@ -115,12 +115,12 @@ export async function scrapWithFireEngine({
           priority,
           engine,
           instantReturn: true,
+          mobile: pageOptions?.mobile ?? false,
           ...fireEngineOptionsParam,
           atsv: pageOptions?.atsv ?? false,
           scrollXPaths: pageOptions?.scrollXPaths ?? [],
           geolocation: pageOptions?.geolocation,
           skipTlsVerification: pageOptions?.skipTlsVerification ?? false,
-          removeBase64Images: pageOptions?.removeBase64Images ?? true,
           actions: actions,
         },
         {
@@ -201,13 +201,11 @@ export async function scrapWithFireEngine({
       logParams.html = data.content ?? "";
       logParams.response_code = data.pageStatusCode;
       logParams.error_message = data.pageError ?? data.error;
-
       return {
         html: data.content ?? "",
         screenshots: data.screenshots ?? [data.screenshot] ?? [],
         pageStatusCode: data.pageStatusCode,
         pageError: data.pageError ?? data.error,
-        scrapeActionContent: data?.actionContent ?? [],
       };
     }
   } catch (error) {
