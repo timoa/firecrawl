@@ -147,6 +147,7 @@ export const scrapeOptions = z.object({
   }).optional(),
   skipTlsVerification: z.boolean().default(false),
   removeBase64Images: z.boolean().default(true),
+  deduplicateSimilarURLs: z.boolean().default(true),
 }).strict(strictMessage)
 
 
