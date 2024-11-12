@@ -5,6 +5,7 @@ import { logger } from "../lib/logger";
 
 dotenv.config();
 
+
 export async function fireEngineMap(
   q: string,
   options: {
@@ -28,24 +29,28 @@ export async function fireEngineMap(
       page: options.page ?? 1,
     });
 
+    console.log("data", data);
+
     if (!process.env.FIRE_ENGINE_BETA_URL) {
       console.warn(
         "(v1/map Beta) Results might differ from cloud offering currently."
       );
       return [];
     }
+    console.log("process.env.FIRE_ENGINE_BETA_URL", process.env.FIRE_ENGINE_BETA_URL);
 
     const response = await fetch(`${process.env.FIRE_ENGINE_BETA_URL}/search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Disable-Cache": "true",
+        "X-Disable-Cache": "true"
       },
-      body: data,
+      body: data
     });
 
     if (response.ok) {
       const responseData = await response.json();
+      console.log("response", responseData);
       return responseData;
     } else {
       return [];
