@@ -191,7 +191,7 @@ export async function extractController(
 
   return res.status(200).json({
     success: true,
-    data: null,
+    data: {} as Document,
     scrape_id: origin?.includes("website") ? jobId : undefined,
   });
 }
