@@ -1,27 +1,16 @@
 import { Request, Response } from "express";
-import { Logger } from "../../lib/logger";
 import {
   Document,
-  legacyDocumentConverter,
-  legacyExtractorOptions,
-  legacyScrapeOptions,
   RequestWithAuth,
   ExtractRequest,
   extractRequestSchema,
   ExtractResponse,
-  legacyCrawlerOptions,
   MapDocument,
 } from "./types";
-import { billTeam } from "../../services/billing/credit_billing";
 import { v4 as uuidv4 } from "uuid";
-import { numTokensFromString } from "../../lib/LLM-extraction/helpers";
-import { addScrapeJob, waitForJob } from "../../services/queue-jobs";
-import { logJob } from "../../services/logging/log_job";
 import { getJobPriority } from "../../lib/job-priority";
 import { PlanType } from "../../types";
 import { getMapResults } from "./map";
-import { rerankDocuments } from "../../lib/extract/reranker";
-import { generateBasicCompletion } from "../../lib/extract/completions";
 
 
 
@@ -49,7 +38,7 @@ export async function extractController(
   const mappedDocuments: MapDocument[] = [];
 
   const prompt = req.body.prompt;
-  const keywords = await generateBasicCompletion(`If the user's prompt is: "${prompt}", what are the most important keywords besides the extraction task? Output only the keywords, separated by commas.`);
+  // const keywords = await generateBasicCompletion(`If the user's prompt is: "${prompt}", what are the most important keywords besides the extraction task? Output only the keywords, separated by commas.`);
 
   for (const url of urls) {
     if (url.endsWith("/*")) {
@@ -66,15 +55,15 @@ export async function extractController(
         subId: req.acuc?.sub_id,
         includeMetadata: true
       });
-      // top 3 links 
-      const top3Links = (mapResults.links as MapDocument[]).slice(0, 3);
-      console.log(top3Links);
-    //   console.log(top3Links);
-      mappedDocuments.push(...(mapResults.links as MapDocument[]));
-       // transform mappedUrls to just documents
-  // we quickly rerank
-      const rerank = await rerankDocuments(mappedDocuments.map(x => `URL: ${x.url}\nTITLE: ${x.title}\nDESCRIPTION: ${x.description}`), "What URLs are most relevant to the following prompt: " + req.body.prompt.toLocaleLowerCase().replace("extract", " ").replace("extract ", " "));
-      console.log(rerank);
+  //     // top 3 links 
+  //     const top3Links = (mapResults.links as MapDocument[]).slice(0, 3);
+  //     console.log(top3Links);
+  //   //   console.log(top3Links);
+  //     mappedDocuments.push(...(mapResults.links as MapDocument[]));
+  //      // transform mappedUrls to just documents
+  // // we quickly rerank
+  //     const rerank = await rerankDocuments(mappedDocuments.map(x => `URL: ${x.url}\nTITLE: ${x.title}\nDESCRIPTION: ${x.description}`), "What URLs are most relevant to the following prompt: " + (req.body.prompt || '').toLocaleLowerCase().replace("extract", " ").replace("extract ", " "));
+  //     console.log(rerank);
     } else {
         mappedDocuments.push({ url });
     }
