@@ -131,6 +131,7 @@ export const extractV1Options = z.object({
   limit: z.number().int().positive().finite().safe().optional(),
   ignoreSitemap: z.boolean().default(false),
   includeSubdomains: z.boolean().default(true),
+  allowExternalLinks: z.boolean().default(false),
   origin: z.string().optional().default("api"),
   timeout: z.number().int().positive().finite().safe().default(60000),
 }).strict(strictMessage)
@@ -319,7 +320,7 @@ export type ExtractResponse =
   | {
       success: true;
       warning?: string;
-      data: Document;
+      data: z.infer<typeof extractRequestSchema>;
       scrape_id?: string;
     };
 
