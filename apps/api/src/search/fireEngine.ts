@@ -26,7 +26,7 @@ export async function fireEngineMap(
       location: options.location,
       tbs: options.tbs,
       numResults: options.numResults,
-      page: options.page ?? 1,
+      page: options.page ?? 1
     });
 
     if (!process.env.FIRE_ENGINE_BETA_URL) {
