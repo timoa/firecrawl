@@ -1,23 +1,7 @@
 import axios, { type AxiosResponse, type AxiosRequestHeaders, AxiosError } from "axios";
 import type * as zt from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
-
-import type { WebSocket as IsowsWebSocket } from 'isows';
-/**
- * Dynamically imports the WebSocket class from 'isows'.
- * If the import fails, WebSocket is set to null.
- * This approach is used because some environments, such as Firebase Functions,
- * might not support WebSocket natively.
- */
-const WebSocket: typeof IsowsWebSocket | null = await (async () => {
-  try {
-    const module = await import('isows');
-    return module.WebSocket;
-  } catch (error) {
-    return null;
-  }
-})();
-
+import { WebSocket } from "isows";
 import { TypedEventTarget } from "typescript-event-target";
 
 /**
@@ -263,7 +247,6 @@ export interface ExtractParams<LLMSchema extends zt.ZodSchema = any> {
   schema?: LLMSchema;
   systemPrompt?: string;
   allowExternalLinks?: boolean;
-  includeSubdomains?: boolean;
 }
 
 /**
@@ -480,7 +463,7 @@ export default class FirecrawlApp {
           let statusData = response.data
           if ("data" in statusData) {
             let data = statusData.data;
-            while (typeof statusData === 'object' && 'next' in statusData) {
+            while ('next' in statusData) {
               statusData = (await this.getRequest(statusData.next, headers)).data;
               data = data.concat(statusData.data);
             }
@@ -714,7 +697,7 @@ export default class FirecrawlApp {
           let statusData = response.data
           if ("data" in statusData) {
             let data = statusData.data;
-            while (typeof statusData === 'object' && 'next' in statusData) {
+            while ('next' in statusData) {
               statusData = (await this.getRequest(statusData.next, headers)).data;
               data = data.concat(statusData.data);
             }
@@ -873,46 +856,42 @@ export default class FirecrawlApp {
     headers: AxiosRequestHeaders,
     checkInterval: number
   ): Promise<CrawlStatusResponse | ErrorResponse> {
-    try {
-      while (true) {
-        let statusResponse: AxiosResponse = await this.getRequest(
-          `${this.apiUrl}/v1/crawl/${id}`,
-          headers
-        );
-        if (statusResponse.status === 200) {
-          let statusData = statusResponse.data;
-            if (statusData.status === "completed") {
-              if ("data" in statusData) {
-                let data = statusData.data;
-                while (typeof statusData === 'object' && 'next' in statusData) {
-                  statusResponse = await this.getRequest(statusData.next, headers);
-                  statusData = statusResponse.data;
-                  data = data.concat(statusData.data);
-                }
-                statusData.data = data;
-                return statusData;
-              } else {
-                throw new FirecrawlError("Crawl job completed but no data was returned", 500);
+    while (true) {
+      let statusResponse: AxiosResponse = await this.getRequest(
+        `${this.apiUrl}/v1/crawl/${id}`,
+        headers
+      );
+      if (statusResponse.status === 200) {
+        let statusData = statusResponse.data;
+          if (statusData.status === "completed") {
+            if ("data" in statusData) {
+              let data = statusData.data;
+              while ('next' in statusData) {
+                statusResponse = await this.getRequest(statusData.next, headers);
+                statusData = statusResponse.data;
+                data = data.concat(statusData.data);
               }
-            } else if (
-            ["active", "paused", "pending", "queued", "waiting", "scraping"].includes(statusData.status)
-          ) {
-            checkInterval = Math.max(checkInterval, 2);
-            await new Promise((resolve) =>
-              setTimeout(resolve, checkInterval * 1000)
-            );
-          } else {
-            throw new FirecrawlError(
-              `Crawl job failed or was stopped. Status: ${statusData.status}`,
-              500
-            );
-          }
+              statusData.data = data;
+              return statusData;
+            } else {
+              throw new FirecrawlError("Crawl job completed but no data was returned", 500);
+            }
+          } else if (
+          ["active", "paused", "pending", "queued", "waiting", "scraping"].includes(statusData.status)
+        ) {
+          checkInterval = Math.max(checkInterval, 2);
+          await new Promise((resolve) =>
+            setTimeout(resolve, checkInterval * 1000)
+          );
         } else {
-          this.handleError(statusResponse, "check crawl status");
+          throw new FirecrawlError(
+            `Crawl job failed or was stopped. Status: ${statusData.status}`,
+            500
+          );
         }
+      } else {
+        this.handleError(statusResponse, "check crawl status");
       }
-    } catch (error: any) {
-      throw new FirecrawlError(error, 500);
     }
   }
 
@@ -955,11 +934,11 @@ export class CrawlWatcher extends TypedEventTarget<CrawlWatcherEvents> {
   private ws: WebSocket;
   public data: FirecrawlDocument<undefined>[];
   public status: CrawlStatusResponse["status"];
+  public id: string;
 
   constructor(id: string, app: FirecrawlApp) {
     super();
-    if(!WebSocket)
-      throw new FirecrawlError("WebSocket module failed to load. Your system might not support WebSocket.", 500);
+    this.id = id;
     this.ws = new WebSocket(`${app.apiUrl}/v1/crawl/${id}`, app.apiKey);
     this.status = "scraping";
     this.data = [];
@@ -990,6 +969,7 @@ export class CrawlWatcher extends TypedEventTarget<CrawlWatcherEvents> {
           detail: {
             status: this.status,
             data: this.data,
+            id: this.id,
           },
         }));
       } else if (msg.type === "error") {
@@ -999,6 +979,7 @@ export class CrawlWatcher extends TypedEventTarget<CrawlWatcherEvents> {
             status: this.status,
             data: this.data,
             error: msg.error,
+            id: this.id,
           },
         }));
       } else if (msg.type === "catchup") {
@@ -1006,12 +987,18 @@ export class CrawlWatcher extends TypedEventTarget<CrawlWatcherEvents> {
         this.data.push(...(msg.data.data ?? []));
         for (const doc of this.data) {
           this.dispatchTypedEvent("document", new CustomEvent("document", {
-            detail: doc,
+            detail: {
+              ...doc,
+              id: this.id,
+            },
           }));
         }
       } else if (msg.type === "document") {
         this.dispatchTypedEvent("document", new CustomEvent("document", {
-          detail: msg.data,
+          detail: {
+            ...msg.data,
+            id: this.id,
+          },
         }));
       }
     }
@@ -1038,6 +1025,7 @@ export class CrawlWatcher extends TypedEventTarget<CrawlWatcherEvents> {
           status: this.status,
           data: this.data,
           error: "WebSocket error",
+          id: this.id,
         },
       }));
     }).bind(this);
