@@ -34,5 +34,5 @@ apps/js-sdk/firecrawl/dist
 /examples/sonnet_web_crawler/firecrawl_env
 /examples/internal_link_assitant/firecrawl_env
 
-
-.vscode
+/apps/api/logs/*
+/apps/api/debug/*
