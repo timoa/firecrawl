@@ -1,5 +1,5 @@
 import axios, { type AxiosResponse, type AxiosRequestHeaders, AxiosError } from "axios";
-import * as zt from "zod";
+import type * as zt from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { WebSocket } from "isows";
 import { TypedEventTarget } from "typescript-event-target";
@@ -247,9 +247,10 @@ export interface MapResponse {
  */
 export interface ExtractParams<LLMSchema extends zt.ZodSchema = any> {
   prompt?: string;
-  schema?: LLMSchema | object;
+  schema?: LLMSchema;
   systemPrompt?: string;
   allowExternalLinks?: boolean;
+  includeSubdomains?: boolean;
 }
 
 /**
@@ -563,7 +564,11 @@ export default class FirecrawlApp {
           let statusData = response.data
           if ("data" in statusData) {
             let data = statusData.data;
-            while ('next' in statusData) {
+            while (typeof statusData === 'object' && 'next' in statusData) {
+              if (data.length === 0) {
+                console.warn("Expected 'data' is missing.")
+                break
+              }
               statusData = (await this.getRequest(statusData.next, headers)).data;
               data = data.concat(statusData.data);
             }
@@ -810,7 +815,11 @@ export default class FirecrawlApp {
           let statusData = response.data
           if ("data" in statusData) {
             let data = statusData.data;
-            while ('next' in statusData) {
+            while (typeof statusData === 'object' && 'next' in statusData) {
+              if (data.length === 0) {
+                console.warn("Expected 'data' is missing.")
+                break
+              }
               statusData = (await this.getRequest(statusData.next, headers)).data;
               data = data.concat(statusData.data);
             }
@@ -860,18 +869,16 @@ export default class FirecrawlApp {
   async extract<T extends zt.ZodSchema = any>(urls: string[], params?: ExtractParams<T>): Promise<ExtractResponse<zt.infer<T>> | ErrorResponse> {
     const headers = this.prepareHeaders();
 
+    if (!params?.prompt) {
+      throw new FirecrawlError("Prompt is required", 400);
+    }
+
     let jsonData: { urls: string[] } & ExtractParams<T> = { urls,  ...params };
     let jsonSchema: any;
     try {
-      if (!params?.schema) {
-        jsonSchema = undefined;
-      } else if (params.schema instanceof zt.ZodType) {
-        jsonSchema = zodToJsonSchema(params.schema);
-      } else {
-        jsonSchema = params.schema;
-      }
+      jsonSchema = params?.schema ? zodToJsonSchema(params.schema) : undefined;
     } catch (error: any) {
-      throw new FirecrawlError("Invalid schema. Schema must be either a valid Zod schema or JSON schema object.", 400);
+      throw new FirecrawlError("Invalid schema. Use a valid Zod schema.", 400);
     }
 
     try {
@@ -984,42 +991,50 @@ export default class FirecrawlApp {
     headers: AxiosRequestHeaders,
     checkInterval: number
   ): Promise<CrawlStatusResponse | ErrorResponse> {
-    while (true) {
-      let statusResponse: AxiosResponse = await this.getRequest(
-        `${this.apiUrl}/v1/crawl/${id}`,
-        headers
-      );
-      if (statusResponse.status === 200) {
-        let statusData = statusResponse.data;
-          if (statusData.status === "completed") {
-            if ("data" in statusData) {
-              let data = statusData.data;
-              while ('next' in statusData) {
-                statusResponse = await this.getRequest(statusData.next, headers);
-                statusData = statusResponse.data;
-                data = data.concat(statusData.data);
+    try {
+      while (true) {
+        let statusResponse: AxiosResponse = await this.getRequest(
+          `${this.apiUrl}/v1/crawl/${id}`,
+          headers
+        );
+        if (statusResponse.status === 200) {
+          let statusData = statusResponse.data;
+            if (statusData.status === "completed") {
+              if ("data" in statusData) {
+                let data = statusData.data;
+                while (typeof statusData === 'object' && 'next' in statusData) {
+                  if (data.length === 0) {
+                    console.warn("Expected 'data' is missing.")
+                    break
+                  }
+                  statusResponse = await this.getRequest(statusData.next, headers);
+                  statusData = statusResponse.data;
+                  data = data.concat(statusData.data);
+                }
+                statusData.data = data;
+                return statusData;
+              } else {
+                throw new FirecrawlError("Crawl job completed but no data was returned", 500);
               }
-              statusData.data = data;
-              return statusData;
-            } else {
-              throw new FirecrawlError("Crawl job completed but no data was returned", 500);
-            }
-          } else if (
-          ["active", "paused", "pending", "queued", "waiting", "scraping"].includes(statusData.status)
-        ) {
-          checkInterval = Math.max(checkInterval, 2);
-          await new Promise((resolve) =>
-            setTimeout(resolve, checkInterval * 1000)
-          );
+            } else if (
+            ["active", "paused", "pending", "queued", "waiting", "scraping"].includes(statusData.status)
+          ) {
+            checkInterval = Math.max(checkInterval, 2);
+            await new Promise((resolve) =>
+              setTimeout(resolve, checkInterval * 1000)
+            );
+          } else {
+            throw new FirecrawlError(
+              `Crawl job failed or was stopped. Status: ${statusData.status}`,
+              500
+            );
+          }
         } else {
-          throw new FirecrawlError(
-            `Crawl job failed or was stopped. Status: ${statusData.status}`,
-            500
-          );
+          this.handleError(statusResponse, "check crawl status");
         }
-      } else {
-        this.handleError(statusResponse, "check crawl status");
       }
+    } catch (error: any) {
+      throw new FirecrawlError(error, 500);
     }
   }
 
