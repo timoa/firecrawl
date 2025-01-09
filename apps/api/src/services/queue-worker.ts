@@ -746,6 +746,7 @@ async function processJob(job: Job & { id: string }, token: string) {
           {
             content: doc,
             source: doc?.metadata?.sourceURL ?? doc?.metadata?.url ?? "",
+            id: job.id,
           },
         ],
       },
