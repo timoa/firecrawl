@@ -257,6 +257,7 @@ export interface ExtractParams<LLMSchema extends zt.ZodSchema = any> {
   systemPrompt?: string;
   allowExternalLinks?: boolean;
   includeSubdomains?: boolean;
+  origin?: string;
 }
 
 /**
@@ -1014,7 +1015,7 @@ export default class FirecrawlApp {
     try {
       const response: AxiosResponse = await this.postRequest(
         this.apiUrl + `/v1/extract`,
-        { ...jsonData, schema: jsonSchema, origin: "api-sdk" },
+        { ...jsonData, schema: jsonSchema, origin: params?.origin || "api-sdk" },
         headers
       );
 
